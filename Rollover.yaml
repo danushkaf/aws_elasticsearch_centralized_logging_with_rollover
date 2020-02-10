@@ -1,0 +1,61 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Configure ES Log rollover
+Parameters:
+  S3BucketName:
+    Type: String
+    Default: 'lambda-code'
+    Description: Lambda Code zip file S3 bucket name
+  S3FileName:
+    Type: String
+    Default: 'Rollover.zip'
+    Description: Lambda Code zip filename in S3
+Metadata:
+  'AWS::CloudFormation::Interface':
+    ParameterGroups:
+      - Label:
+          default: Configurations
+        Parameters:
+          - S3BucketName
+          - S3FileName
+Resources:
+  LambdaBasicExecution:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+      Path: /
+  LogsRollover:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      Runtime: nodejs12.x
+      Role:
+        Fn::GetAtt:
+          - "LambdaBasicExecution"
+          - "Arn"
+      Handler: index.handler
+      Code:
+        S3Bucket: !Sub ${S3BucketName}
+        S3Key: !Sub ${S3FileName}
+      Description: Invoke a function during stack creation.
+  CloudWatchLogRolloverRule:
+    Type: 'AWS::Events::Rule'
+    Properties:
+      Description: 'Rollover Log indices'
+      ScheduleExpression: 'cron(0 0 * * ? *)'
+      State: 'ENABLED'
+      Targets:
+        - Id: 'Rollover-Lambda-Function'
+          Arn: 
+            Fn::GetAtt:
+              - "LogsRollover"
+              - "Arn"
+

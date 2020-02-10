@@ -1,0 +1,85 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Create Log publish resources
+Parameters:
+  EnvironmentName:
+    Type: String
+    Default: 'development'
+    Description: Name Of The Environment
+  ClusterName:
+    Type: String
+    Default: 'dev-eks'
+    Description: Name Of The EKS Cluster
+  Region:
+    Type: String
+    Default: 'us-east-1'
+    Description: Name Of The Region
+  S3BucketName:
+    Type: String
+    Default: 'lambda-code'
+    Description: Lambda Code zip file S3 bucket name
+  S3FileName:
+    Type: String
+    Default: 'logstoes-development.zip'
+    Description: Lambda Code zip filename in S3
+Metadata:
+  'AWS::CloudFormation::Interface':
+    ParameterGroups:
+      - Label:
+          default: Configurations
+        Parameters:
+          - EnvironmentName
+          - ClusterName
+          - Region
+          - S3BucketName
+          - S3FileName
+Resources:
+  LambdaBasicExecution:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+      Path: /
+  LogsToElasticsearch:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      FunctionName: !Sub 'LogsToElasticsearch-${EnvironmentName}-${ClusterName}'
+      Runtime: nodejs12.x
+      Role:
+        Fn::GetAtt:
+          - "LambdaBasicExecution"
+          - "Arn"
+      Handler: index.handler
+      Code:
+        S3Bucket: !Sub ${S3BucketName}
+        S3Key: !Sub ${S3FileName}
+      Description: Invoke a function during stack creation.
+  CloudWatchSubscriptionFunctionPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName:
+        Fn::GetAtt:
+          - "LogsToElasticsearch"
+          - "Arn"
+      Action: 'lambda:InvokeFunction'
+      Principal: !Sub 'logs.${Region}.amazonaws.com'
+      SourceArn: !Sub 'arn:aws:logs:us-east-1:453740448243:log-group:/${EnvironmentName}/eks/${ClusterName}/containers:*'
+  SubscriptionFilter:
+    Type: AWS::Logs::SubscriptionFilter
+    DependsOn: CloudWatchSubscriptionFunctionPermission
+    Properties:
+      LogGroupName: !Sub '/${EnvironmentName}/eks/${ClusterName}/containers'
+      FilterPattern: ""
+      DestinationArn:
+        Fn::GetAtt:
+          - "LogsToElasticsearch"
+          - "Arn"
+
