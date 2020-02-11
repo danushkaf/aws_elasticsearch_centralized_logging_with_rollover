@@ -1,0 +1,65 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Configure ES Old Log Deletion
+Parameters:
+  S3BucketName:
+    Type: String
+    Default: 'lambda-code'
+    Description: Lambda Code zip file S3 bucket name
+  S3FileName:
+    Type: String
+    Default: 'delete-old-logs-development.zip'
+    Description: Lambda Code zip filename in S3
+  Environment:
+    Type: String
+    Default: 'development'
+    Description: Environment name
+Metadata:
+  'AWS::CloudFormation::Interface':
+    ParameterGroups:
+      - Label:
+          default: Configurations
+        Parameters:
+          - S3BucketName
+          - S3FileName
+          - Environment
+Resources:
+  LambdaBasicExecution:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+      Path: /
+  DeleteOldLogs:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      Runtime: nodejs12.x
+      Role:
+        Fn::GetAtt:
+          - "LambdaBasicExecution"
+          - "Arn"
+      Handler: index.handler
+      Code:
+        S3Bucket: !Sub ${S3BucketName}
+        S3Key: !Sub ${S3FileName}
+      Description: Invoke a function during stack creation.
+  CloudWatchLogRolloverRule:
+    Type: 'AWS::Events::Rule'
+    Properties:
+      Description: 'Delete old indices'
+      ScheduleExpression: 'cron(0 0 * * ? *)'
+      State: 'ENABLED'
+      Targets:
+        - Id: !Sub 'Delete-Old-Lambda-Function-${Environment}'
+          Arn:
+            Fn::GetAtt:
+              - "DeleteOldLogs"
+              - "Arn"
