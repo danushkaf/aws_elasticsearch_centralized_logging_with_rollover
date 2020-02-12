@@ -10,13 +10,16 @@ exports.handler = function(event, context) {
     };
     var host = "search-xxx.xxx.es.amazonaws.com";
     var indices = [];
+
     var get_indices_options = {
         host: host,
         port: 443,
         path: '/*',
         method: 'GET'
     };
+
     var indicesOutput = '';
+
 
     var get_indices_request = http.request(get_indices_options, function(res) {
         res.setEncoding('utf8');
@@ -34,6 +37,7 @@ exports.handler = function(event, context) {
                     var rolloverOutput = '';
                     var aliasName = key.substr(0, key.lastIndexOf("-"));
                     if (!Object.keys(index.aliases).length) {
+                        console.log("Creating Alias for : " + key + ", Alias name : " + aliasName);
                         var alias = {
                             "actions": [{
                                 "add": {
@@ -54,13 +58,13 @@ exports.handler = function(event, context) {
                                 'Content-Length': Buffer.byteLength(JSON.stringify(alias))
                             }
                         };
-                        var post_alias_req = http.request(post_alias_options, function(res) {
-                            res.setEncoding('utf8');
-                            res.on('data', (chunk) => {
+                        var post_alias_req = http.request(post_alias_options, function(post_alias_res) {
+                            post_alias_res.setEncoding('utf8');
+                            post_alias_res.on('data', (chunk) => {
                                 aliasesOutput += chunk;
                             });
 
-                            res.on('end', () => {
+                            post_alias_res.on('end', () => {
                                 console.log('Post Alias Response: ' + aliasesOutput);
                                 var post_rollover_options = {
                                     host: host,
@@ -72,17 +76,17 @@ exports.handler = function(event, context) {
                                         'Content-Length': Buffer.byteLength(JSON.stringify(obj))
                                     }
                                 };
-                                var post_rollover_req = http.request(post_rollover_options, function(res) {
-                                    res.setEncoding('utf8');
-                                    res.on('data', (chunk) => {
+                                var post_rollover_req = http.request(post_rollover_options, function(post_rollover_res) {
+                                    post_rollover_res.setEncoding('utf8');
+                                    post_rollover_res.on('data', (chunk) => {
                                         rolloverOutput += chunk;
                                     });
 
-                                    res.on('end', () => {
+                                    post_rollover_res.on('end', () => {
                                         console.log('Post Rollover Response: ' + rolloverOutput);
                                         context.succeed();
                                     });
-                                    res.on('error', function(e) {
+                                    post_rollover_res.on('error', function(e) {
                                         console.log("Post Rollover Got error: " + e.message);
                                         context.done(null, 'FAILURE');
                                     });
@@ -92,7 +96,7 @@ exports.handler = function(event, context) {
                                 post_rollover_req.end();
                                 context.succeed();
                             });
-                            res.on('error', function(e) {
+                            post_alias_res.on('error', function(e) {
                                 console.log("Post Alias Got error: " + e.message);
                                 context.done(null, 'FAILURE');
                             });
@@ -101,6 +105,7 @@ exports.handler = function(event, context) {
                         post_alias_req.write(JSON.stringify(alias));
                         post_alias_req.end();
                     } else {
+                        console.log("Starting to Rollover Index : " + key);
                         var post_rollover_options = {
                             host: host,
                             port: 443,
@@ -111,17 +116,17 @@ exports.handler = function(event, context) {
                                 'Content-Length': Buffer.byteLength(JSON.stringify(obj))
                             }
                         };
-                        var post_rollover_req = http.request(post_rollover_options, function(res) {
-                            res.setEncoding('utf8');
-                            res.on('data', (chunk) => {
+                        var post_rollover_req = http.request(post_rollover_options, function(post_rollover_res) {
+                            post_rollover_res.setEncoding('utf8');
+                            post_rollover_res.on('data', (chunk) => {
                                 rolloverOutput += chunk;
                             });
 
-                            res.on('end', () => {
+                            post_rollover_res.on('end', () => {
                                 console.log('Post Rollover Response: ' + rolloverOutput);
                                 context.succeed();
                             });
-                            res.on('error', function(e) {
+                            post_rollover_res.on('error', function(e) {
                                 console.log("Post Rollover Got error: " + e.message);
                                 context.done(null, 'FAILURE');
                             });
@@ -141,5 +146,4 @@ exports.handler = function(event, context) {
         });
     });
     get_indices_request.end();
-
 }
