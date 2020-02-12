@@ -51,14 +51,14 @@ Resources:
         S3Bucket: !Sub ${S3BucketName}
         S3Key: !Sub ${S3FileName}
       Description: Invoke a function during stack creation.
-  CloudWatchLogRolloverRule:
+  CWRule:
     Type: 'AWS::Events::Rule'
     Properties:
       Description: 'Delete old indices'
       ScheduleExpression: 'cron(0 0 * * ? *)'
       State: 'ENABLED'
       Targets:
-        - Id: !Sub 'Delete-Old-Lambda-Function-${Environment}'
+        - Id: !Sub 'DelOldLogs-${Environment}'
           Arn:
             Fn::GetAtt:
               - "DeleteOldLogs"
