@@ -47,17 +47,17 @@ exports.handler = function(event, context) {
                                 }
                             };
                             var deleteOutput = '';
-                            var delete_index_req = http.request(delete_index_options, function(res) {
-                                res.setEncoding('utf8');
-                                res.on('data', (chunk) => {
+                            var delete_index_req = http.request(delete_index_options, function(delete_res) {
+                                delete_res.setEncoding('utf8');
+                                delete_res.on('data', (chunk) => {
                                     deleteOutput += chunk;
                                 });
 
-                                res.on('end', () => {
+                                delete_res.on('end', () => {
                                     console.log('Delete Index Response: ' + deleteOutput);
                                     context.succeed();
                                 });
-                                res.on('error', function(e) {
+                                delete_res.on('error', function(e) {
                                     console.log("Delete Index Got error: " + e.message);
                                     context.done(null, 'FAILURE');
                                 });
@@ -66,7 +66,8 @@ exports.handler = function(event, context) {
                             delete_index_req.end();
                         }
                     } catch (e) {
-                        // Continue when timestamp is not found
+                      console.log(e);
+                      // Continue when timestamp is not found
                     }
                 }
             }
