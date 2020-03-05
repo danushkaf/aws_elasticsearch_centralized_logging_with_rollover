@@ -1,0 +1,169 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Provision Secured Elasticsearch instance
+Parameters:
+  EsDomainName:
+    Type: String
+    Default: 'dbib-logs'
+    Description: EsDomainName
+  EsInstanceCount:
+    Type: Number
+    Default: 2
+    Description: EsInstanceCount
+  EsAvailZoneCount:
+    Type: Number
+    Default: 2
+    Description: EsAvailZoneCount
+  EBSSize:
+    Type: Number
+    Default: 30
+    Description: EBSSize
+Metadata:
+  'AWS::CloudFormation::Interface':
+    ParameterGroups:
+      - Label:
+          default: Configurations
+        Parameters:
+          - EsDomainName
+          - EBSSize
+          - EsInstanceCount
+          - EsAvailZoneCount
+Resources:
+  CognitoESUserPool:
+    Type: 'AWS::Cognito::UserPool'
+    Properties:
+      UserPoolName: !Sub CognitoESUserPool-${EsDomainName}
+      UsernameAttributes:
+        - email
+      AutoVerifiedAttributes:
+        - email
+      VerificationMessageTemplate:
+        DefaultEmailOption: CONFIRM_WITH_LINK
+  UserPoolDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties:
+      UserPoolId: !Ref CognitoESUserPool
+      Domain: !Sub '${EsDomainName}'
+  CognitoESIdentityPool:
+    Type: 'AWS::Cognito::IdentityPool'
+    Properties:
+      IdentityPoolName: !Sub CognitoESIdentityPool-${EsDomainName}
+      AllowUnauthenticatedIdentities: false
+  CognitoAccessForAmazonES:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - es.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/AmazonESCognitoAccess'
+  CognitoIDPAuthRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: cognito-identity.amazonaws.com
+            Action: 'sts:AssumeRoleWithWebIdentity'
+            Condition:
+              StringEquals:
+                'cognito-identity.amazonaws.com:aud': !Ref CognitoESIdentityPool
+              'ForAnyValue:StringLike':
+                'cognito-identity.amazonaws.com:amr': authenticated
+      Policies:
+        - PolicyDocument: '{ "Version": "2012-10-17", "Statement": [ { "Effect": "Allow", "Action": [ "mobileanalytics:PutEvents", "cognito-sync:*", "cognito-identity:*"], "Resource": ["*"] } ] }'
+          PolicyName: !Sub 'IDP_Auth_Policy_${EsDomainName}'
+  CognitoIDPUnAuthRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: cognito-identity.amazonaws.com
+            Action: 'sts:AssumeRoleWithWebIdentity'
+            Condition:
+              StringEquals:
+                'cognito-identity.amazonaws.com:aud': !Ref CognitoESIdentityPool
+              'ForAnyValue:StringLike':
+                'cognito-identity.amazonaws.com:amr': unauthenticated
+      Policies:
+        - PolicyDocument: '{ "Version": "2012-10-17", "Statement": [ { "Effect": "Allow", "Action": [ "mobileanalytics:PutEvents", "cognito-sync:*" ], "Resource": [ "*" ] } ] }'
+          PolicyName: !Sub 'IDP_UnAuth_Policy_${EsDomainName}'
+  KibanaAdminRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - es.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/AmazonESFullAccess'
+  KibanaUserRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - es.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/AmazonESReadOnlyAccess'
+  IdentityPoolRoleAttachment:
+    Type: AWS::Cognito::IdentityPoolRoleAttachment
+    Properties:
+      IdentityPoolId: !Ref CognitoESIdentityPool
+      Roles:
+        "authenticated": !GetAtt CognitoIDPAuthRole.Arn
+        "unauthenticated": !GetAtt CognitoIDPUnAuthRole.Arn
+  ElasticsearchDomain:
+    Type: 'AWS::Elasticsearch::Domain'
+    Properties:
+      DomainName: !Ref EsDomainName
+      ElasticsearchVersion: 7.1
+      ElasticsearchClusterConfig:
+        InstanceCount: !Ref EsInstanceCount
+        ZoneAwarenessEnabled: 'true'
+        ZoneAwarenessConfig:
+          AvailabilityZoneCount: !Ref EsAvailZoneCount
+        InstanceType: m4.large.elasticsearch
+      CognitoOptions:
+        Enabled: true
+        IdentityPoolId: !Ref CognitoESIdentityPool
+        RoleArn: !GetAtt CognitoAccessForAmazonES.Arn
+        UserPoolId: !Ref CognitoESUserPool
+      EBSOptions:
+        EBSEnabled: true
+        VolumeSize: !Ref EBSSize
+        VolumeType: standard
+      EncryptionAtRestOptions:
+        Enabled: true
+      NodeToNodeEncryptionOptions:
+        Enabled: true
+      SnapshotOptions:
+        AutomatedSnapshotStartHour: '0'
+      AccessPolicies:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: !GetAtt CognitoIDPAuthRole.Arn
+            Action: 'es:*'
+            Resource: !Sub 'arn:aws:es:${AWS::Region}:${AWS::AccountId}:domain/${EsDomainName}/*'
