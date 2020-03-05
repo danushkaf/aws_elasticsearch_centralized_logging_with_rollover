@@ -47,6 +47,8 @@ Resources:
           - "LambdaBasicExecution"
           - "Arn"
       Handler: index.handler
+      MemorySize: 1024
+      Timeout: 300
       Code:
         S3Bucket: !Sub ${S3BucketName}
         S3Key: !Sub ${S3FileName}
