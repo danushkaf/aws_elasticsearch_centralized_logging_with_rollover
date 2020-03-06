@@ -164,6 +164,6 @@ Resources:
         Statement:
           - Effect: Allow
             Principal:
-              AWS: !GetAtt CognitoIDPAuthRole.Arn
+              AWS: '*'
             Action: 'es:*'
             Resource: !Sub 'arn:aws:es:${AWS::Region}:${AWS::AccountId}:domain/${EsDomainName}/*'
