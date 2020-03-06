@@ -3,7 +3,7 @@ Description: Provision Secured Elasticsearch instance
 Parameters:
   EsDomainName:
     Type: String
-    Default: 'dbib-logs'
+    Default: 'application-logs'
     Description: EsDomainName
   EsInstanceCount:
     Type: Number
@@ -32,6 +32,8 @@ Resources:
     Type: 'AWS::Cognito::UserPool'
     Properties:
       UserPoolName: !Sub CognitoESUserPool-${EsDomainName}
+      AdminCreateUserConfig:
+        AllowAdminCreateUserOnly: true
       UsernameAttributes:
         - email
       AutoVerifiedAttributes:
