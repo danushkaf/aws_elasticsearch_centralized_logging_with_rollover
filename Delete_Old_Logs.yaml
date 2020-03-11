@@ -13,6 +13,9 @@ Parameters:
     Type: String
     Default: 'development'
     Description: Environment name
+  LabmdaRoleArn:
+    Type: String
+    Description: Lambda Role Arn
 Metadata:
   'AWS::CloudFormation::Interface':
     ParameterGroups:
@@ -22,30 +25,13 @@ Metadata:
           - S3BucketName
           - S3FileName
           - Environment
+          - LabmdaRoleArn
 Resources:
-  LambdaBasicExecution:
-    Type: 'AWS::IAM::Role'
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: 2012-10-17
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service:
-                - lambda.amazonaws.com
-            Action:
-              - 'sts:AssumeRole'
-      ManagedPolicyArns:
-        - 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
-      Path: /
   DeleteOldLogs:
     Type: 'AWS::Lambda::Function'
     Properties:
       Runtime: nodejs12.x
-      Role:
-        Fn::GetAtt:
-          - "LambdaBasicExecution"
-          - "Arn"
+      Role: !Ref LabmdaRoleArn
       Handler: index.handler
       MemorySize: 1024
       Timeout: 300
@@ -61,7 +47,4 @@ Resources:
       State: 'ENABLED'
       Targets:
         - Id: !Sub 'DelOldLogs-${Environment}'
-          Arn:
-            Fn::GetAtt:
-              - "DeleteOldLogs"
-              - "Arn"
+          Arn: !Ref LabmdaRoleArn

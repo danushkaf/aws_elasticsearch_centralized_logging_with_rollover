@@ -28,6 +28,21 @@ Metadata:
           - EsInstanceCount
           - EsAvailZoneCount
 Resources:
+  LambdaBasicExecution:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+      Path: /
   CognitoESUserPool:
     Type: 'AWS::Cognito::UserPool'
     Properties:
@@ -141,6 +156,7 @@ Resources:
       DomainName: !Ref EsDomainName
       ElasticsearchVersion: 7.1
       ElasticsearchClusterConfig:
+        DedicatedMasterEnabled: true
         InstanceCount: !Ref EsInstanceCount
         ZoneAwarenessEnabled: 'true'
         ZoneAwarenessConfig:
@@ -166,6 +182,6 @@ Resources:
         Statement:
           - Effect: Allow
             Principal:
-              AWS: '*'
+              AWS: !GetAtt LambdaBasicExecution.Arn
             Action: 'es:*'
             Resource: !Sub 'arn:aws:es:${AWS::Region}:${AWS::AccountId}:domain/${EsDomainName}/*'

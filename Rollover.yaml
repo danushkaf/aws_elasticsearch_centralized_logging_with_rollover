@@ -7,8 +7,11 @@ Parameters:
     Description: Lambda Code zip file S3 bucket name
   S3FileName:
     Type: String
-    Default: 'Rollover.zip'
+    Default: 'rollover.zip'
     Description: Lambda Code zip filename in S3
+  LabmdaRoleArn:
+    Type: String
+    Description: Lambda Role Arn
 Metadata:
   'AWS::CloudFormation::Interface':
     ParameterGroups:
@@ -17,30 +20,13 @@ Metadata:
         Parameters:
           - S3BucketName
           - S3FileName
+          - LabmdaRoleArn
 Resources:
-  LambdaBasicExecution:
-    Type: 'AWS::IAM::Role'
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: 2012-10-17
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service:
-                - lambda.amazonaws.com
-            Action:
-              - 'sts:AssumeRole'
-      ManagedPolicyArns:
-        - 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
-      Path: /
   LogsRollover:
     Type: 'AWS::Lambda::Function'
     Properties:
       Runtime: nodejs12.x
-      Role:
-        Fn::GetAtt:
-          - "LambdaBasicExecution"
-          - "Arn"
+      Role: !Ref LabmdaRoleArn
       Handler: index.handler
       MemorySize: 1024
       Timeout: 300
@@ -56,7 +42,4 @@ Resources:
       State: 'ENABLED'
       Targets:
         - Id: 'Rollover-Lambda-Function'
-          Arn:
-            Fn::GetAtt:
-              - "LogsRollover"
-              - "Arn"
+          Arn: !Ref LabmdaRoleArn

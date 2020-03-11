@@ -21,6 +21,9 @@ Parameters:
     Type: String
     Default: 'logstoes-development.zip'
     Description: Lambda Code zip filename in S3
+  LabmdaRoleArn:
+    Type: String
+    Description: Lambda Role Arn
 Metadata:
   'AWS::CloudFormation::Interface':
     ParameterGroups:
@@ -32,31 +35,14 @@ Metadata:
           - Region
           - S3BucketName
           - S3FileName
+          - LabmdaRoleArn
 Resources:
-  LambdaBasicExecution:
-    Type: 'AWS::IAM::Role'
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: 2012-10-17
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service:
-                - lambda.amazonaws.com
-            Action:
-              - 'sts:AssumeRole'
-      ManagedPolicyArns:
-        - 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
-      Path: /
   LogsToElasticsearch:
     Type: 'AWS::Lambda::Function'
     Properties:
       FunctionName: !Sub 'LogsToElasticsearch-${EnvironmentName}-${ClusterName}'
       Runtime: nodejs12.x
-      Role:
-        Fn::GetAtt:
-          - "LambdaBasicExecution"
-          - "Arn"
+      Role: !Ref LabmdaRoleArn
       Handler: index.handler
       Code:
         S3Bucket: !Sub ${S3BucketName}
@@ -82,4 +68,3 @@ Resources:
         Fn::GetAtt:
           - "LogsToElasticsearch"
           - "Arn"
-

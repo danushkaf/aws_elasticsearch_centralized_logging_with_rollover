@@ -1,6 +1,8 @@
 var querystring = require('querystring');
 var https = require('https');
+var AWS = require('aws-sdk');
 
+var region = 'xxx';
 var host = "search-xxxx.xxx.es.amazonaws.com";
 
 exports.handler = async (event, context) => {
@@ -36,30 +38,33 @@ function getIndicesPromise(context) {
     return new Promise((resolve, reject) => {
         var aliases = {};
         var indices = [];
-        var get_indices_options = {
-            host: host,
-            port: 443,
-            path: '/*',
-            method: 'GET'
-        };
         var indicesOutput = '';
-
-        var get_indices_request = https.request(get_indices_options, function(res) {
-            res.setEncoding('utf8');
-            res.on('data', (chunk) => {
+        var endpoint = new AWS.Endpoint(host);
+        var request = new AWS.HttpRequest(endpoint, region);
+        request.method = 'GET';
+        request.headers['Content-Type'] = 'application/json';
+        request.headers['Content-Length'] = 0;
+        request.path = '/*';
+        request.headers['host'] = host;
+        request.headers['port'] = 443;
+        var credentials = new AWS.EnvironmentCredentials('AWS');
+        var signer = new AWS.Signers.V4(request, 'es');
+        signer.addAuthorization(credentials, new Date());
+        var client = new AWS.HttpClient();
+        client.handleRequest(request, null, function(response) {
+            console.log(response.statusCode + ' ' + response.statusMessage);
+            response.on('data', function(chunk) {
                 indicesOutput += chunk;
             });
-            res.on('end', () => {
+            response.on('end', function(chunk) {
                 console.log('Get Indices Response: ');
                 indices = JSON.parse(indicesOutput);
                 resolve(indices);
             });
-            res.on('error', function(e) {
-                console.log("Get Indices Got error: " + e.message);
-                reject(e);
-            });
+        }, function(e) {
+            console.log("Get Indices Got error: " + e.message);
+            reject(e);
         });
-        get_indices_request.end();
     });
 }
 
@@ -76,31 +81,33 @@ async function getIndices(context) {
 
 function delIndicesPromise(context, key) {
     return new Promise((resolve, reject) => {
-        var delete_index_options = {
-            host: host,
-            port: 443,
-            path: '/' + key,
-            method: 'DELETE'
-        };
         var deleteOutput = '';
-        var delete_index_req = https.request(delete_index_options, function(delete_res) {
-            delete_res.setEncoding('utf8');
-            delete_res.on('data', (chunk) => {
+        var endpoint = new AWS.Endpoint(host);
+        var request = new AWS.HttpRequest(endpoint, region);
+        request.method = 'DELETE';
+        request.headers['Content-Type'] = 'application/json';
+        request.headers['Content-Length'] = 0;
+        request.path = '/' + key;
+        request.headers['host'] = host;
+        request.headers['port'] = 443;
+        var credentials = new AWS.EnvironmentCredentials('AWS');
+        var signer = new AWS.Signers.V4(request, 'es');
+        signer.addAuthorization(credentials, new Date());
+        var client = new AWS.HttpClient();
+        client.handleRequest(request, null, function(response) {
+            console.log(response.statusCode + ' ' + response.statusMessage);
+            response.on('data', function(chunk) {
                 console.log('Data: ' + chunk);
                 deleteOutput += chunk;
             });
-
-            delete_res.on('end', () => {
+            response.on('end', function(chunk) {
                 console.log('Delete Index Response: ' + deleteOutput);
                 resolve(deleteOutput);
             });
-            delete_res.on('error', function(e) {
-                console.log("Delete Index Got error: " + e.message);
-                reject(e);
-            });
-
+        }, function(e) {
+            console.log("Delete Index Got error: " + e.message);
+            reject(e);
         });
-        delete_index_req.end();
     });
 }
 

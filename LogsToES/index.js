@@ -2,10 +2,12 @@
 var https = require('https');
 var zlib = require('zlib');
 var crypto = require('crypto');
+var AWS = require('aws-sdk');
 
-var endpoint = 'search-xxx.xxx.es.amazonaws.com';
+var region = 'xxx';
+var host = "search-xxxx.xxx.es.amazonaws.com";
 
-// Set this to true if you want to debug why data isn't making it to 
+// Set this to true if you want to debug why data isn't making it to
 // your Elasticsearch cluster. This will enable logging of failed items
 // to CloudWatch Logs.
 var logFailedResponses = false;
@@ -66,7 +68,7 @@ async function transform(payload, context) {
         var namespace = jsonMessage['kubernetes']['namespace_name'];
         var serviceName = jsonMessage['kubernetes']['labels']['app'];
 
-        var aliasName = 'staging_' + namespace + '_' + serviceName + '_logs_write';
+        var aliasName = 'development_' + namespace + '_' + serviceName + '_logs_write';
 
         var latestIndexName = await getIndexName(aliasName, context);
 
@@ -105,23 +107,25 @@ async function transform(payload, context) {
 function getPromise(alias, context) {
     return new Promise((resolve, reject) => {
         var aliases = {};
-        var get_alias_options = {
-            host: endpoint,
-            port: 443,
-            path: '/_alias/' + alias,
-            method: 'GET'
-        };
-
         var aliasesOutput = '';
-        var finished = false;
-        var latestIndex = '';
-
-        var get_alias_request = https.request(get_alias_options, function(res) {
-            res.setEncoding('utf8');
-            res.on('data', (chunk) => {
+        var endpoint = new AWS.Endpoint(host);
+        var request = new AWS.HttpRequest(endpoint, region);
+        request.method = 'GET';
+        request.headers['Content-Type'] = 'application/json';
+        request.headers['Content-Length'] = 0;
+        request.path = '/*';
+        request.headers['host'] = host;
+        request.headers['port'] = 443;
+        var credentials = new AWS.EnvironmentCredentials('AWS');
+        var signer = new AWS.Signers.V4(request, 'es');
+        signer.addAuthorization(credentials, new Date());
+        var client = new AWS.HttpClient();
+        client.handleRequest(request, null, function(response) {
+            console.log(response.statusCode + ' ' + response.statusMessage);
+            response.on('data', function(chunk) {
                 aliasesOutput += chunk;
             });
-            res.on('end', () => {
+            response.on('end', function(chunk) {
                 console.log('Get Aliases Response: ');
                 aliases = JSON.parse(aliasesOutput);
                 for (let key in aliases) {
@@ -134,7 +138,7 @@ function getPromise(alias, context) {
                                         var aliasObj = index.aliases[aliasName];
                                         if (aliasObj) {
                                             if (aliasName === alias && true === aliasObj['is_write_index']) {
-                                                latestIndex = key;
+                                                var latestIndex = key;
                                                 resolve(latestIndex.toString());
                                                 break;
                                             }
@@ -146,16 +150,11 @@ function getPromise(alias, context) {
                     }
                 }
                 resolve("");
-                context.succeed();
-                finished = true;
             });
-            res.on('error', function(e) {
-                console.log("Get Indices Got error: " + e.message);
-                context.done(null, 'FAILURE');
-                reject(e);
-            });
+        }, function(e) {
+            console.log("Get Indices Got error: " + e.message);
+            reject(e);
         });
-        get_alias_request.end();
     });
 }
 
@@ -171,6 +170,7 @@ async function getIndexName(alias, context) {
 }
 
 function buildSource(message, extractedFields) {
+    var jsonSubString = '';
     if (extractedFields) {
         var source = {};
 
@@ -223,7 +223,7 @@ function isNumeric(n) {
 }
 
 function post(body, callback) {
-    var requestParams = buildRequest(endpoint, body);
+    var requestParams = buildRequest(host, body);
 
     var request = https.request(requestParams, function(response) {
         var responseBody = '';
@@ -250,7 +250,7 @@ function post(body, callback) {
             }
 
             if (response.statusCode !== 200 || info.errors === true) {
-                // prevents logging of failed entries, but allows logging 
+                // prevents logging of failed entries, but allows logging
                 // of other errors such as access restrictions
                 delete info.items;
                 error = {
