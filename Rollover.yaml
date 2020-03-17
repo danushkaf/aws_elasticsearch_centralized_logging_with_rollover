@@ -46,5 +46,8 @@ Resources:
       ScheduleExpression: !Sub 'cron(${CronExpression})'
       State: 'ENABLED'
       Targets:
-        - Id: 'Rollover-Lambda-Function'
-          Arn: !Ref LabmdaRoleArn
+        - Id: !Sub 'Rollover-${EnvironmentName}'
+          Arn:
+            Fn::GetAtt:
+              - "LogsRollover"
+              - "Arn"

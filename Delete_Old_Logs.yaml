@@ -52,4 +52,7 @@ Resources:
       State: 'ENABLED'
       Targets:
         - Id: !Sub 'DelOldLogs-${Environment}'
-          Arn: !Ref LabmdaRoleArn
+          Arn:
+            Fn::GetAtt:
+              - "DeleteOldLogs"
+              - "Arn"
