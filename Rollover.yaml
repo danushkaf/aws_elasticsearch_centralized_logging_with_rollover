@@ -9,6 +9,10 @@ Parameters:
     Type: String
     Default: 'rollover.zip'
     Description: Lambda Code zip filename in S3
+  CronExpression:
+    Type: String
+    Default: '0 0 * * ? *'
+    Description: Cron Expression for the rule
   LabmdaRoleArn:
     Type: String
     Description: Lambda Role Arn
@@ -20,6 +24,7 @@ Metadata:
         Parameters:
           - S3BucketName
           - S3FileName
+          - CronExpression
           - LabmdaRoleArn
 Resources:
   LogsRollover:
@@ -29,7 +34,7 @@ Resources:
       Role: !Ref LabmdaRoleArn
       Handler: index.handler
       MemorySize: 1024
-      Timeout: 300
+      Timeout: 900
       Code:
         S3Bucket: !Sub ${S3BucketName}
         S3Key: !Sub ${S3FileName}
@@ -38,7 +43,7 @@ Resources:
     Type: 'AWS::Events::Rule'
     Properties:
       Description: 'Rollover Log indices'
-      ScheduleExpression: 'cron(0 0 * * ? *)'
+      ScheduleExpression: !Sub 'cron(${CronExpression})'
       State: 'ENABLED'
       Targets:
         - Id: 'Rollover-Lambda-Function'

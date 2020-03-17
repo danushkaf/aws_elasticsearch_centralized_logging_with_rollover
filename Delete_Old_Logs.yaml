@@ -9,6 +9,10 @@ Parameters:
     Type: String
     Default: 'delete-old-logs-development.zip'
     Description: Lambda Code zip filename in S3
+  CronExpression:
+    Type: String
+    Default: '0 0 * * ? *'
+    Description: Cron Expression for the rule
   Environment:
     Type: String
     Default: 'development'
@@ -24,6 +28,7 @@ Metadata:
         Parameters:
           - S3BucketName
           - S3FileName
+          - CronExpression
           - Environment
           - LabmdaRoleArn
 Resources:
@@ -43,7 +48,7 @@ Resources:
     Type: 'AWS::Events::Rule'
     Properties:
       Description: 'Delete old indices'
-      ScheduleExpression: 'cron(0 0 * * ? *)'
+      ScheduleExpression: !Sub 'cron(${CronExpression})'
       State: 'ENABLED'
       Targets:
         - Id: !Sub 'DelOldLogs-${Environment}'
