@@ -17,6 +17,14 @@ Parameters:
     Type: Number
     Default: 30
     Description: EBSSize
+  DataInstanceType:
+    Type: String
+    Default: 'r5.2xlarge.elasticsearch'
+    Description: DataInstanceType
+  MasterInstanceType:
+    Type: String
+    Default: 'c5.2xlarge.elasticsearch'
+    Description: MasterInstanceType
 Metadata:
   'AWS::CloudFormation::Interface':
     ParameterGroups:
@@ -27,6 +35,8 @@ Metadata:
           - EBSSize
           - EsInstanceCount
           - EsAvailZoneCount
+          - DataInstanceType
+          - MasterInstanceType
 Resources:
   LambdaBasicExecution:
     Type: 'AWS::IAM::Role'
@@ -157,12 +167,12 @@ Resources:
       ElasticsearchVersion: 7.4
       ElasticsearchClusterConfig:
         DedicatedMasterEnabled: true
-        DedicatedMasterType: c5.2xlarge.elasticsearch
+        DedicatedMasterType: !Ref MasterInstanceType
         InstanceCount: !Ref EsInstanceCount
         ZoneAwarenessEnabled: 'true'
         ZoneAwarenessConfig:
           AvailabilityZoneCount: !Ref EsAvailZoneCount
-        InstanceType: r5.2xlarge.elasticsearch
+        InstanceType: !Ref DataInstanceType
       CognitoOptions:
         Enabled: true
         IdentityPoolId: !Ref CognitoESIdentityPool
