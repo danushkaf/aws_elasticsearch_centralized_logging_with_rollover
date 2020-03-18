@@ -154,14 +154,14 @@ Resources:
     Type: 'AWS::Elasticsearch::Domain'
     Properties:
       DomainName: !Ref EsDomainName
-      ElasticsearchVersion: 7.1
+      ElasticsearchVersion: 7.4
       ElasticsearchClusterConfig:
         DedicatedMasterEnabled: true
         InstanceCount: !Ref EsInstanceCount
         ZoneAwarenessEnabled: 'true'
         ZoneAwarenessConfig:
           AvailabilityZoneCount: !Ref EsAvailZoneCount
-        InstanceType: m4.large.elasticsearch
+        InstanceType: r5.large.elasticsearch
       CognitoOptions:
         Enabled: true
         IdentityPoolId: !Ref CognitoESIdentityPool
@@ -182,7 +182,7 @@ Resources:
         Statement:
           - Effect: Allow
             Principal:
-              AWS: 
+              AWS:
                 - !GetAtt LambdaBasicExecution.Arn
                 - !GetAtt CognitoIDPAuthRole.Arn
             Action: 'es:*'
