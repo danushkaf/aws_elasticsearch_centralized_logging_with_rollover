@@ -4,6 +4,7 @@ var AWS = require('aws-sdk');
 
 var region = 'xxx';
 var host = "search-xxxx.xxx.es.amazonaws.com";
+var rolledIndices = [];
 
 exports.handler = async (event, context) => {
     var indices = await getIndices(context);
@@ -14,6 +15,9 @@ exports.handler = async (event, context) => {
         if (indices.hasOwnProperty(key)) {
             var index = indices[key];
             var aliasName = key.substr(0, key.lastIndexOf("-"));
+            if (rolledIndices.includes(aliasName)){
+              continue;
+            }
             if (!Object.keys(index.aliases).length) {
                 console.log("Creating Alias for : " + key + ", Alias name : " + aliasName);
                 var alias = await createAlias(context, aliasName, key);
@@ -155,6 +159,7 @@ function rolloverPromise(context, aliasName, index) {
             });
             response.on('end', function(chunk) {
                 console.log('Post Rollover Response: ' + rolloverOutput);
+                rolledIndices.push(aliasName);
                 resolve(rolloverOutput);
             });
         }, function(e) {
