@@ -157,11 +157,12 @@ Resources:
       ElasticsearchVersion: 7.4
       ElasticsearchClusterConfig:
         DedicatedMasterEnabled: true
+        DedicatedMasterType: c5.2xlarge.elasticsearch
         InstanceCount: !Ref EsInstanceCount
         ZoneAwarenessEnabled: 'true'
         ZoneAwarenessConfig:
           AvailabilityZoneCount: !Ref EsAvailZoneCount
-        InstanceType: r5.large.elasticsearch
+        InstanceType: r5.2xlarge.elasticsearch
       CognitoOptions:
         Enabled: true
         IdentityPoolId: !Ref CognitoESIdentityPool
