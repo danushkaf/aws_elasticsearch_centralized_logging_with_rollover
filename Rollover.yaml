@@ -46,7 +46,7 @@ Resources:
       ScheduleExpression: !Sub 'cron(${CronExpression})'
       State: 'ENABLED'
       Targets:
-        - Id: !Sub 'Rollover'
+        - Id: 'Rollover-logs-daily'
           Arn:
             Fn::GetAtt:
               - "LogsRollover"
