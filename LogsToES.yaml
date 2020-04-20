@@ -9,10 +9,6 @@ Parameters:
     Type: String
     Default: 'dev-eks'
     Description: Name Of The EKS Cluster
-  Region:
-    Type: String
-    Default: 'us-east-1'
-    Description: Name Of The Region
   S3BucketName:
     Type: String
     Default: 'lambda-code'
@@ -32,7 +28,6 @@ Metadata:
         Parameters:
           - EnvironmentName
           - ClusterName
-          - Region
           - S3BucketName
           - S3FileName
           - LabmdaRoleArn
@@ -56,8 +51,8 @@ Resources:
           - "LogsToElasticsearch"
           - "Arn"
       Action: 'lambda:InvokeFunction'
-      Principal: !Sub 'logs.${Region}.amazonaws.com'
-      SourceArn: !Sub 'arn:aws:logs:us-east-1:453740448243:log-group:/${EnvironmentName}/eks/${ClusterName}/containers:*'
+      Principal: !Sub 'logs.${AWS::Region}.amazonaws.com'
+      SourceArn: !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/${EnvironmentName}/eks/${ClusterName}/containers:*'
   SubscriptionFilter:
     Type: AWS::Logs::SubscriptionFilter
     DependsOn: CloudWatchSubscriptionFunctionPermission
