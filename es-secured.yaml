@@ -21,6 +21,10 @@ Parameters:
     Type: String
     Default: 'r5.2xlarge.elasticsearch'
     Description: DataInstanceType
+  IsDedicatedMasterEnabled:
+    Type: String
+    Default: 'Enabled'
+    Description: Whether Dedicated Master Feature is enabled
   MasterInstanceType:
     Type: String
     Default: 'c5.2xlarge.elasticsearch'
@@ -35,8 +39,11 @@ Metadata:
           - EBSSize
           - EsInstanceCount
           - EsAvailZoneCount
+          - IsDedicatedMasterEnabled
           - DataInstanceType
           - MasterInstanceType
+Conditions:
+  HasDedicatedMasterEnabled: !Equals [!Ref IsDedicatedMasterEnabled, 'enabled']
 Resources:
   LambdaBasicExecution:
     Type: 'AWS::IAM::Role'
@@ -166,8 +173,14 @@ Resources:
       DomainName: !Ref EsDomainName
       ElasticsearchVersion: 7.4
       ElasticsearchClusterConfig:
-        DedicatedMasterEnabled: true
-        DedicatedMasterType: !Ref MasterInstanceType
+        DedicatedMasterEnabled: !If
+          - HasDedicatedMasterEnabled
+          - true
+          - false
+        DedicatedMasterType: !If
+          - HasDedicatedMasterEnabled
+          - !Ref MasterInstanceType
+          - ''
         InstanceCount: !Ref EsInstanceCount
         ZoneAwarenessEnabled: 'true'
         ZoneAwarenessConfig:
