@@ -24,6 +24,9 @@ Parameters:
   IsDedicatedMasterEnabled:
     Type: String
     Default: 'Enabled'
+    AllowedValues:
+      - Enabled
+      - Disabled
     Description: Whether Dedicated Master Feature is enabled
   MasterInstanceType:
     Type: String
@@ -180,7 +183,7 @@ Resources:
         DedicatedMasterType: !If
           - HasDedicatedMasterEnabled
           - !Ref MasterInstanceType
-          - ''
+          - !Ref AWS::NoValue
         InstanceCount: !Ref EsInstanceCount
         ZoneAwarenessEnabled: 'true'
         ZoneAwarenessConfig:
