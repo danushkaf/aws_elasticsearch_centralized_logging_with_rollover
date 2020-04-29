@@ -2,15 +2,16 @@ var querystring = require('querystring');
 var https = require('https');
 var AWS = require('aws-sdk');
 
-var region = 'xxx';
-var host = "search-xxxx.xxx.es.amazonaws.com";
+let region = process.env.AWS_REGION;
+let host = process.env.elasticsearch_cluster_dns;
+let environment_name = process.env.environment_name;
 
 exports.handler = async (event, context) => {
 
     var indices = await getIndices(context);
 
     for (let key in indices) {
-        if (!key.startsWith("development_")) {
+        if (!key.startsWith(environment_name + "_")) {
             continue;
         }
         if (indices.hasOwnProperty(key)) {

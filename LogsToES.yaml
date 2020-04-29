@@ -5,6 +5,9 @@ Parameters:
     Type: String
     Default: 'development'
     Description: Name Of The Environment
+  ESClusterDomainEP:
+    Type: String
+    Description: ES Cluster Domain Endpoint
   ClusterName:
     Type: String
     Default: 'dev-eks'
@@ -27,6 +30,7 @@ Metadata:
           default: Configurations
         Parameters:
           - EnvironmentName
+          - ESClusterDomainEP
           - ClusterName
           - S3BucketName
           - S3FileName
@@ -39,6 +43,10 @@ Resources:
       Runtime: nodejs12.x
       Role: !Ref LabmdaRoleArn
       Handler: index.handler
+      Environment:
+        Variables:
+          elasticsearch_cluster_dns: !Ref ESClusterDomainEP
+          environment_name: !Ref EnvironmentName
       Code:
         S3Bucket: !Sub ${S3BucketName}
         S3Key: !Sub ${S3FileName}

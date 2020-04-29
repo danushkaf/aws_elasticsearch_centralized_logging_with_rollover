@@ -9,6 +9,13 @@ Parameters:
     Type: String
     Default: 'rollover.zip'
     Description: Lambda Code zip filename in S3
+  ESClusterDomainEP:
+    Type: String
+    Description: ES Cluster Domain Endpoint
+  EnvironmentName:
+    Type: String
+    Default: 'development'
+    Description: Environment Name
   CronExpression:
     Type: String
     Default: '0 0 * * ? *'
@@ -26,6 +33,8 @@ Metadata:
           - S3FileName
           - CronExpression
           - LabmdaRoleArn
+          - ESClusterDomainEP
+          - EnvironmentName
 Resources:
   LogsRollover:
     Type: 'AWS::Lambda::Function'
@@ -33,6 +42,10 @@ Resources:
       Runtime: nodejs12.x
       Role: !Ref LabmdaRoleArn
       Handler: index.handler
+      Environment:
+        Variables:
+          elasticsearch_cluster_dns: !Ref ESClusterDomainEP
+          environment_name: !Ref EnvironmentName
       MemorySize: 1024
       Timeout: 900
       Code:

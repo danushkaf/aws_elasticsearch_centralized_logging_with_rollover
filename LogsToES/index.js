@@ -4,8 +4,9 @@ var zlib = require('zlib');
 var crypto = require('crypto');
 var AWS = require('aws-sdk');
 
-var region = 'xxx';
-var host = "search-xxxx.xxx.es.amazonaws.com";
+let region = process.env.AWS_REGION;
+let host = process.env.elasticsearch_cluster_dns;
+let environment_name = process.env.environment_name;
 
 // Set this to true if you want to debug why data isn't making it to
 // your Elasticsearch cluster. This will enable logging of failed items
@@ -68,7 +69,7 @@ async function transform(payload, context) {
         var namespace = jsonMessage['kubernetes']['namespace_name'];
         var serviceName = jsonMessage['kubernetes']['labels']['app'];
 
-        var aliasName = 'development_' + namespace + '_' + serviceName + '_logs_write';
+        var aliasName = environment_name + "_" + namespace + '_' + serviceName + '_logs_write';
 
         var latestIndexName = await getIndexName(aliasName, context);
 

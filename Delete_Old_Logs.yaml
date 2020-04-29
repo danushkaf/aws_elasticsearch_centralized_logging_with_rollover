@@ -13,10 +13,13 @@ Parameters:
     Type: String
     Default: '0 0 * * ? *'
     Description: Cron Expression for the rule
-  Environment:
+  EnvironmentName:
     Type: String
     Default: 'development'
     Description: Environment name
+  ESClusterDomainEP:
+    Type: String
+    Description: ES Cluster Domain Endpoint
   LabmdaRoleArn:
     Type: String
     Description: Lambda Role Arn
@@ -29,7 +32,8 @@ Metadata:
           - S3BucketName
           - S3FileName
           - CronExpression
-          - Environment
+          - EnvironmentName
+          - ESClusterDomainEP
           - LabmdaRoleArn
 Resources:
   DeleteOldLogs:
@@ -38,6 +42,10 @@ Resources:
       Runtime: nodejs12.x
       Role: !Ref LabmdaRoleArn
       Handler: index.handler
+      Environment:
+        Variables:
+          elasticsearch_cluster_dns: !Ref ESClusterDomainEP
+          environment_name: !Ref EnvironmentName
       MemorySize: 1024
       Timeout: 300
       Code:
@@ -51,7 +59,7 @@ Resources:
       ScheduleExpression: !Sub 'cron(${CronExpression})'
       State: 'ENABLED'
       Targets:
-        - Id: !Sub 'DelOldLogs-${Environment}'
+        - Id: !Sub 'DelOldLogs-${EnvironmentName}'
           Arn:
             Fn::GetAtt:
               - "DeleteOldLogs"
