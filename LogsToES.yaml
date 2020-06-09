@@ -47,6 +47,8 @@ Resources:
         Variables:
           elasticsearch_cluster_dns: !Ref ESClusterDomainEP
           environment_name: !Ref EnvironmentName
+      MemorySize: 256
+      Timeout: 30
       Code:
         S3Bucket: !Sub ${S3BucketName}
         S3Key: !Sub ${S3FileName}
