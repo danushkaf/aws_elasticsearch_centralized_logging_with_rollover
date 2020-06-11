@@ -23,6 +23,18 @@ Parameters:
   LabmdaRoleArn:
     Type: String
     Description: Lambda Role Arn
+  MemorySizeMB:
+    Type: Number
+    Default: 1024
+    Description: Lambda max MemorySize in MB
+  LambdaTimeoutSeconds:
+    Type: Number
+    Default: 300
+    Description: Lambda timeout value
+  LogRetentionTimePeriod:
+    Type: String
+    Default: 3
+    Description: ES Log retention time period
 Metadata:
   'AWS::CloudFormation::Interface':
     ParameterGroups:
@@ -35,6 +47,8 @@ Metadata:
           - EnvironmentName
           - ESClusterDomainEP
           - LabmdaRoleArn
+          - MemorySizeMB
+          - LambdaTimeoutSeconds
 Resources:
   DeleteOldLogs:
     Type: 'AWS::Lambda::Function'
@@ -46,12 +60,28 @@ Resources:
         Variables:
           elasticsearch_cluster_dns: !Ref ESClusterDomainEP
           environment_name: !Ref EnvironmentName
-      MemorySize: 1024
-      Timeout: 300
+          retention_period: !Ref LogRetentionTimePeriod
+      MemorySize: !Ref MemorySizeMB
+      Timeout: !Ref LambdaTimeoutSeconds
       Code:
         S3Bucket: !Sub ${S3BucketName}
         S3Key: !Sub ${S3FileName}
       Description: Invoke a function during stack creation.
+
+  CloudWatchSubscriptionFunctionPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName:
+        Fn::GetAtt:
+          - "DeleteOldLogs"
+          - "Arn"
+      Action: 'lambda:InvokeFunction'
+      Principal: 'events.amazonaws.com'
+      SourceArn:
+        Fn::GetAtt:
+          - "CWRule"
+          - "Arn"
+
   CWRule:
     Type: 'AWS::Events::Rule'
     Properties:

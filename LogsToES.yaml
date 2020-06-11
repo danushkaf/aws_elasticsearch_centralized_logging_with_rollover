@@ -16,6 +16,14 @@ Parameters:
     Type: String
     Default: 'lambda-code'
     Description: Lambda Code zip file S3 bucket name
+  MemorySizeMB:
+    Type: Number
+    Default: 256
+    Description: Lambda max MemorySize in MB
+  LambdaTimeoutSeconds:
+    Type: Number
+    Default: 30
+    Description: Lambda timeout value
   S3FileName:
     Type: String
     Default: 'logstoes-development.zip'
@@ -35,6 +43,8 @@ Metadata:
           - S3BucketName
           - S3FileName
           - LabmdaRoleArn
+          - MemorySizeMB
+          - LambdaTimeoutSeconds
 Resources:
   LogsToElasticsearch:
     Type: 'AWS::Lambda::Function'
@@ -47,12 +57,13 @@ Resources:
         Variables:
           elasticsearch_cluster_dns: !Ref ESClusterDomainEP
           environment_name: !Ref EnvironmentName
-      MemorySize: 256
-      Timeout: 30
+      MemorySize: !Ref MemorySizeMB
+      Timeout: !Ref LambdaTimeoutSeconds
       Code:
         S3Bucket: !Sub ${S3BucketName}
         S3Key: !Sub ${S3FileName}
       Description: Invoke a function during stack creation.
+
   CloudWatchSubscriptionFunctionPermission:
     Type: AWS::Lambda::Permission
     Properties:
@@ -63,6 +74,7 @@ Resources:
       Action: 'lambda:InvokeFunction'
       Principal: !Sub 'logs.${AWS::Region}.amazonaws.com'
       SourceArn: !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/${EnvironmentName}/eks/${ClusterName}/containers:*'
+
   SubscriptionFilter:
     Type: AWS::Logs::SubscriptionFilter
     DependsOn: CloudWatchSubscriptionFunctionPermission

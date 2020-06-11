@@ -23,6 +23,14 @@ Parameters:
   LabmdaRoleArn:
     Type: String
     Description: Lambda Role Arn
+  MemorySizeMB:
+    Type: Number
+    Default: 1024
+    Description: Lambda max MemorySize in MB
+  LambdaTimeoutSeconds:
+    Type: Number
+    Default: 900
+    Description: Lambda timeout value
 Metadata:
   'AWS::CloudFormation::Interface':
     ParameterGroups:
@@ -35,6 +43,8 @@ Metadata:
           - LabmdaRoleArn
           - ESClusterDomainEP
           - EnvironmentName
+          - MemorySizeMB
+          - LambdaTimeoutSeconds
 Resources:
   LogsRollover:
     Type: 'AWS::Lambda::Function'
@@ -46,12 +56,27 @@ Resources:
         Variables:
           elasticsearch_cluster_dns: !Ref ESClusterDomainEP
           environment_name: !Ref EnvironmentName
-      MemorySize: 1024
-      Timeout: 900
+      MemorySize: !Ref MemorySizeMB
+      Timeout: !Ref LambdaTimeoutSeconds
       Code:
         S3Bucket: !Sub ${S3BucketName}
         S3Key: !Sub ${S3FileName}
       Description: Invoke a function during stack creation.
+
+  CloudWatchSubscriptionFunctionPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName:
+        Fn::GetAtt:
+          - "LogsRollover"
+          - "Arn"
+      Action: 'lambda:InvokeFunction'
+      Principal: 'events.amazonaws.com'
+      SourceArn:
+        Fn::GetAtt:
+          - "CloudWatchLogRolloverRule"
+          - "Arn"
+
   CloudWatchLogRolloverRule:
     Type: 'AWS::Events::Rule'
     Properties:

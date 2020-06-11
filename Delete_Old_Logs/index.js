@@ -5,6 +5,8 @@ var AWS = require('aws-sdk');
 let region = process.env.AWS_REGION;
 let host = process.env.elasticsearch_cluster_dns;
 let environment_name = process.env.environment_name;
+let retention_period_str = process.env.retention_period;
+let retention_period = parseInt(retention_period_str);
 
 exports.handler = async (event, context) => {
 
@@ -22,7 +24,7 @@ exports.handler = async (event, context) => {
                 var now = new Date();
                 var ageDays = (now.getTime() - createdDate.getTime()) / (1000 * 3600 * 24);
                 console.log("Current Index : " + key + ", Age in Days : " + ageDays);
-                if (ageDays > 3) {
+                if (ageDays > retention_period) {
                     console.log("Deleting the index : " + key);
                     await delIndices(context, key);
                 }
