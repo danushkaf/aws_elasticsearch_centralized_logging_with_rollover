@@ -49,6 +49,7 @@ Metadata:
           - LabmdaRoleArn
           - MemorySizeMB
           - LambdaTimeoutSeconds
+          - LogRetentionTimePeriod
 Resources:
   DeleteOldLogs:
     Type: 'AWS::Lambda::Function'
