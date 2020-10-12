@@ -136,7 +136,7 @@ Resources:
             - !Ref AWS::NoValue
           snapshot_role_name: !If
             - HasSnapshotsReplication
-            - !Ref S3ArchiveRole
+            - !GetAtt S3ArchiveRole.Arn
             - !Ref AWS::NoValue
       MemorySize: !Ref MemorySizeMB
       Timeout: !Ref LambdaTimeoutSeconds
