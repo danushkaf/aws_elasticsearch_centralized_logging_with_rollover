@@ -31,6 +31,14 @@ Parameters:
     Type: Number
     Default: 900
     Description: Lambda timeout value
+  SnapshotsReplication:
+    Type: String
+    AllowedValues:
+      - 'Required'
+      - 'Not Required'
+    Default: Not Required
+    Description: Mention is Snapshots Required
+
 Metadata:
   'AWS::CloudFormation::Interface':
     ParameterGroups:
@@ -45,7 +53,69 @@ Metadata:
           - EnvironmentName
           - MemorySizeMB
           - LambdaTimeoutSeconds
+          - SnapshotsReplication
+
+Conditions:
+  HasSnapshotsReplication: !Equals
+    - !Ref SnapshotsReplication
+    - 'Required'
+
 Resources:
+  S3Bucket:
+    Type: AWS::S3::Bucket
+    Condition: HasSnapshotsReplication
+    Properties:
+      AccessControl: Private
+      VersioningConfiguration:
+        Status: Enabled
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: 'true'
+        BlockPublicPolicy: 'true'
+        IgnorePublicAcls: 'true'
+        RestrictPublicBuckets: 'true'
+      Tags:
+        - Key: "Name"
+          Value: !Sub "${EnvironmentName}-es-index-snapshot-repository"
+
+  S3ArchiveRole:
+    Type: 'AWS::IAM::Role'
+    Condition: HasSnapshotsReplication
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - es.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Path: /
+
+  SnapshotPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Condition: HasSnapshotsReplication
+    Properties:
+      Path: /
+      Roles:
+        - Ref: S3ArchiveRole
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - s3:ListBucket
+          - s3:GetObject
+          - s3:PutObject
+          - s3:DeleteObject
+          Resource:
+            Fn::Join:
+              - ""
+              -
+                - "arn:aws:s3:::"
+                - !Ref S3Bucket
+                - "/*"
+
   LogsRollover:
     Type: 'AWS::Lambda::Function'
     Properties:
@@ -56,6 +126,10 @@ Resources:
         Variables:
           elasticsearch_cluster_dns: !Ref ESClusterDomainEP
           environment_name: !Ref EnvironmentName
+          is_snapshots_enabled: !If
+            - HasSnapshotsReplication
+            - true
+            - false
       MemorySize: !Ref MemorySizeMB
       Timeout: !Ref LambdaTimeoutSeconds
       Code:
