@@ -130,6 +130,14 @@ Resources:
             - HasSnapshotsReplication
             - true
             - false
+          snapshot_bucket_name: !If
+            - HasSnapshotsReplication
+            - !Ref S3Bucket
+            - !Ref AWS::NoValue
+          snapshot_role_name: !If
+            - HasSnapshotsReplication
+            - !Ref S3ArchiveRole
+            - !Ref AWS::NoValue
       MemorySize: !Ref MemorySizeMB
       Timeout: !Ref LambdaTimeoutSeconds
       Code:
