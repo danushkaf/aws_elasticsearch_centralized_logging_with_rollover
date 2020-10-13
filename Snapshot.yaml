@@ -1,0 +1,225 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Configure ES Log rollover
+Parameters:
+  S3BucketName:
+    Type: String
+    Default: 'lambda-code'
+    Description: Lambda Code zip file S3 bucket name
+  S3FileName:
+    Type: String
+    Default: 'snapshot.zip'
+    Description: Lambda Code zip filename in S3
+  SnapshotRegistrationS3FileName:
+    Type: String
+    Default: 'register-snapshot.zip'
+    Description: Lambda Code zip filename in S3
+  ESClusterDomainEP:
+    Type: String
+    Description: ES Cluster Domain Endpoint
+  EnvironmentName:
+    Type: String
+    Default: 'nonproduction'
+    Description: Environment Name
+  CronExpression:
+    Type: String
+    Default: '0 0 * * ? *'
+    Description: Cron Expression for the rule
+  LabmdaRoleName:
+    Type: String
+    Description: Lambda Role Name
+  LabmdaRoleArn:
+    Type: String
+    Description: Lambda Role Arn
+  MemorySizeMB:
+    Type: Number
+    Default: 1024
+    Description: Lambda max MemorySize in MB
+  LambdaTimeoutSeconds:
+    Type: Number
+    Default: 900
+    Description: Lambda timeout value
+  RegistrationMemorySizeMB:
+    Type: Number
+    Default: 1024
+    Description: Registration Lambda max MemorySize in MB
+  RegistrationLambdaTimeoutSeconds:
+    Type: Number
+    Default: 900
+    Description: Registration Lambda timeout value
+
+Metadata:
+  'AWS::CloudFormation::Interface':
+    ParameterGroups:
+      - Label:
+          default: Configurations
+        Parameters:
+          - S3BucketName
+          - S3FileName
+          - SnapshotRegistrationS3FileName
+          - CronExpression
+          - LabmdaRoleArn
+          - LabmdaRoleName
+          - ESClusterDomainEP
+          - EnvironmentName
+          - MemorySizeMB
+          - LambdaTimeoutSeconds
+          - RegistrationMemorySizeMB
+          - RegistrationLambdaTimeoutSeconds
+
+Resources:
+  S3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      AccessControl: Private
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: 'true'
+        BlockPublicPolicy: 'true'
+        IgnorePublicAcls: 'true'
+        RestrictPublicBuckets: 'true'
+      Tags:
+        - Key: "Name"
+          Value: !Sub "${EnvironmentName}-es-index-snapshot-repository"
+
+  S3ArchiveRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - es.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Path: /
+
+  PassRolePolicy:
+    DependsOn: S3ArchiveRole
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      Path: /
+      Roles:
+        - Ref: LabmdaRoleName
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - iam:PassRole
+          Resource: !GetAtt S3ArchiveRole.Arn
+
+  SnapshotPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      Path: /
+      Roles:
+        - Ref: S3ArchiveRole
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - s3:ListBucket
+          Resource:
+            Fn::Join:
+              - ""
+              -
+                - "arn:aws:s3:::"
+                - !Ref S3Bucket
+
+  SnapshotPolicy2:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      Path: /
+      Roles:
+        - Ref: S3ArchiveRole
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - s3:GetObject
+          - s3:PutObject
+          - s3:DeleteObject
+          Resource:
+            Fn::Join:
+              - ""
+              -
+                - "arn:aws:s3:::"
+                - !Ref S3Bucket
+                - "/*"
+
+  SnapshotRegisterResource:
+    DependsOn: PassRolePolicy
+    Type: Custom::ESSnapshotRegister
+    Properties:
+      ServiceToken:
+        Fn::GetAtt:
+        - SnapshotRegisterFunction
+        - Arn
+      Region:
+        Ref: AWS::Region
+
+  SnapshotRegisterFunction:
+    DependsOn: SnapshotPolicy2
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        S3Bucket: !Sub ${S3BucketName}
+        S3Key: !Sub ${SnapshotRegistrationS3FileName}
+      Handler: index.handler
+      MemorySize: !Ref RegistrationMemorySizeMB
+      Timeout: !Ref RegistrationLambdaTimeoutSeconds
+      Environment:
+        Variables:
+          elasticsearch_cluster_dns: !Ref ESClusterDomainEP
+          environment_name: !Ref EnvironmentName
+          snapshot_bucket_name: !Ref S3Bucket
+          snapshot_role_name: !GetAtt S3ArchiveRole.Arn
+      Role: !Ref LabmdaRoleArn
+      Runtime: nodejs12.x
+
+  Snapshot:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      Runtime: nodejs12.x
+      Role: !Ref LabmdaRoleArn
+      Handler: index.handler
+      Environment:
+        Variables:
+          elasticsearch_cluster_dns: !Ref ESClusterDomainEP
+          environment_name: !Ref EnvironmentName
+      MemorySize: !Ref MemorySizeMB
+      Timeout: !Ref LambdaTimeoutSeconds
+      Code:
+        S3Bucket: !Sub ${S3BucketName}
+        S3Key: !Sub ${S3FileName}
+      Description: Invoke a function during stack creation.
+
+  CloudWatchSubscriptionFunctionPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName:
+        Fn::GetAtt:
+          - "Snapshot"
+          - "Arn"
+      Action: 'lambda:InvokeFunction'
+      Principal: 'events.amazonaws.com'
+      SourceArn:
+        Fn::GetAtt:
+          - "CloudWatchSnapshotRule"
+          - "Arn"
+
+  CloudWatchSnapshotRule:
+    Type: 'AWS::Events::Rule'
+    Properties:
+      Description: 'Rollover Log indices'
+      ScheduleExpression: !Sub 'cron(${CronExpression})'
+      State: 'ENABLED'
+      Targets:
+        - Id: 'Index-Snapshot-Daily'
+          Arn:
+            Fn::GetAtt:
+              - "Snapshot"
+              - "Arn"
