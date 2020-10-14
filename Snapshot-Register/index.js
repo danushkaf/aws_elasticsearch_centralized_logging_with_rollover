@@ -9,9 +9,21 @@ let is_snapshots_enabled = process.env.is_snapshots_enabled;
 let snapshot_bucket_name = process.env.snapshot_bucket_name;
 let snapshot_role_name = process.env.snapshot_role_name;
 
+var responseStatus = "FAILED";
+var responseData = {};
+
 exports.handler = async (event, context) => {
-    await snapshotRegister(context);
-    context.succeed();
+    console.log("REQUEST RECEIVED:\n" + JSON.stringify(event));
+
+    // For Delete requests, immediately send a SUCCESS response.
+    if (event.RequestType == "Delete") {
+        responseStatus = "SUCCESS";
+        responseData = {Status: "Success"};
+        sendResponse(context, event);
+        return;
+    }
+    await snapshotRegister(context, event);
+    await sendResponse(context, event);
 }
 
 function snapshotRegisterPromise(context) {
@@ -57,13 +69,78 @@ function snapshotRegisterPromise(context) {
     });
 }
 
-async function snapshotRegister(context) {
+async function snapshotRegister(context, event) {
     try {
         let http_promise = snapshotRegisterPromise(context);
+        let snapshot_register_output = await http_promise;
+        responseStatus = "SUCCESS";
+        responseData = {Status: "Success"};
+        return snapshot_register_output;
+    } catch (error) {
+        console.log(error);
+        responseData = {Error: "Register Snapshot repository call failed"};
+        return "";
+    }
+}
+
+async function sendResponse(context, event) {
+    try {
+        let http_promise = sendResponsePromise(event, context, responseStatus, responseData);
         let snapshot_register_output = await http_promise;
         return snapshot_register_output;
     } catch (error) {
         console.log(error);
         return "";
     }
+}
+
+// Send response to the pre-signed S3 URL
+function sendResponsePromise(event, context, responseStatus, responseData) {
+    return new Promise((resolve, reject) => {
+        var responseBody = JSON.stringify({
+            Status: responseStatus,
+            Reason: "See the details in CloudWatch Log Stream: " + context.logStreamName,
+            PhysicalResourceId: context.logStreamName,
+            StackId: event.StackId,
+            RequestId: event.RequestId,
+            LogicalResourceId: event.LogicalResourceId,
+            Data: responseData
+        });
+
+        console.log("RESPONSE BODY:\n", responseBody);
+
+        var https = require("https");
+        var url = require("url");
+
+        var parsedUrl = url.parse(event.ResponseURL);
+        var options = {
+            hostname: parsedUrl.hostname,
+            port: 443,
+            path: parsedUrl.path,
+            method: "PUT",
+            headers: {
+                "content-type": "",
+                "content-length": responseBody.length
+            }
+        };
+
+        console.log("SENDING RESPONSE...\n");
+
+        var request = https.request(options, function(response) {
+            console.log("STATUS: " + response.statusCode);
+            console.log("HEADERS: " + JSON.stringify(response.headers));
+            // Tell AWS Lambda that the function execution is done
+            context.done();
+        });
+
+        request.on("error", function(error) {
+            console.log("sendResponse Error:" + error);
+            // Tell AWS Lambda that the function execution is done
+            context.done();
+        });
+
+        // write data to request body
+        request.write(responseBody);
+        request.end();
+    });
 }
